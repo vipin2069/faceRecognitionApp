@@ -37,9 +37,9 @@ export class WebcamComponent implements OnInit {
 
   async loadModels() {
     await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri('/assets/models/tiny_face_detector'),
-      faceapi.nets.ageGenderNet.loadFromUri('/assets/models/age_gender_model'),
-      faceapi.nets.faceExpressionNet.loadFromUri('/assets/models/face_expression')
+      faceapi.nets.tinyFaceDetector.loadFromUri('/assets/models/'),
+      faceapi.nets.ageGenderNet.loadFromUri('/assets/models/'),
+      faceapi.nets.faceExpressionNet.loadFromUri('/assets/models/')
     ]);
   }
 
