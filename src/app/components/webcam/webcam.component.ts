@@ -18,6 +18,10 @@ export class WebcamComponent implements OnInit {
   detectInterval: any;
   capturedImage: string | null = null;
 
+  faceInfos: { age: number; gender: string; emotion: string }[] = [];
+
+
+
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {
     this.isBrowser = isPlatformBrowser(this.platformId);
   }
@@ -32,11 +36,10 @@ export class WebcamComponent implements OnInit {
   }
 
   async loadModels() {
-    const MODEL_URL = '/assets/models';
     await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
-      faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+      faceapi.nets.tinyFaceDetector.loadFromUri('/assets/models/tiny_face_detector'),
+      faceapi.nets.ageGenderNet.loadFromUri('/assets/models/age_gender_model'),
+      faceapi.nets.faceExpressionNet.loadFromUri('/assets/models/face_expression')
     ]);
   }
 
@@ -48,8 +51,13 @@ export class WebcamComponent implements OnInit {
       this.videoRef.nativeElement.addEventListener('play', () => {
         const video = this.videoRef.nativeElement;
         const canvas = this.canvasRef.nativeElement;
-        const displaySize = { width: video.width, height: video.height };
 
+        video.width = video.videoWidth;
+        video.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const displaySize = { width: video.videoWidth, height: video.videoHeight };
         faceapi.matchDimensions(canvas, displaySize);
 
         this.detectInterval = setInterval(async () => {
@@ -57,29 +65,51 @@ export class WebcamComponent implements OnInit {
             .withAgeAndGender()
             .withFaceExpressions();
 
-          const resizedDetections = faceapi.resizeResults(detections, displaySize);
+          const resized = faceapi.resizeResults(detections, displaySize);
           const ctx = canvas.getContext('2d');
           ctx?.clearRect(0, 0, canvas.width, canvas.height);
 
+          // Draw bounding boxes
+          faceapi.draw.drawDetections(canvas, resized);
 
-          faceapi.draw.drawDetections(canvas, resizedDetections);
-
+          // Draw face expressions as icons
           // faceapi.draw.drawFaceExpressions(canvas, resized);
 
-          resizedDetections.forEach(det => {
-            const { age, gender, expressions } = det;
-            const { x, y } = det.detection.box;
+          // Draw custom labels: Age, Gender, Emotion
+          ctx!.font = '14px Arial';
+          ctx!.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx!.strokeStyle = '#fff';
+          ctx!.lineWidth = 2;
 
-            ctx!.fillStyle = '#ff4757';
-            ctx!.font = '16px Arial';
-            ctx!.fillText(`Age: ${age.toFixed(0)}, Gender: ${gender}`, x, y - 10);
+          resized.forEach(result => {
+            const { age, gender, expressions, detection } = result;
+            const topLeft = detection.box.topLeft;
 
             const sorted = Object.entries(expressions).sort((a, b) => b[1] - a[1]);
-            if (sorted.length) {
-              ctx!.fillText(`Emotion: ${sorted[0][0]}`, x, y - 30);
+            const emotion = sorted.length ? sorted[0][0] : 'Neutral';
+            const text = `Age: ${Math.round(age)}, Gender: ${gender}, Emotion: ${emotion}`;
+
+            if (ctx && topLeft) {
+              const [x, y] = [topLeft.x, topLeft.y - 10];
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+              ctx.fillRect(x, y - 16, ctx.measureText(text).width + 10, 20);
+              ctx.fillStyle = '#fff';
+              ctx.fillText(text, x + 5, y);
             }
           });
+
+          // Optional: Update faceInfos if needed elsewhere
+          this.faceInfos = resized.map(result => {
+            const sorted = Object.entries(result.expressions).sort((a, b) => b[1] - a[1]);
+            return {
+              age: result.age,
+              gender: result.gender,
+              emotion: sorted.length ? sorted[0][0] : 'Neutral'
+            };
+          });
+
         }, 500);
+
       });
     }
   }
@@ -92,18 +122,53 @@ export class WebcamComponent implements OnInit {
       clearInterval(this.detectInterval);
     }
   }
-  captureImage() {
-    if (!this.videoRef) return;
+  async captureImage() {
+    const video = this.videoRef.nativeElement;
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.warn("Video not ready yet");
+      return;
+    }
 
     const canvas = document.createElement('canvas');
-    const video = this.videoRef.nativeElement;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
     const context = canvas.getContext('2d');
-    if (context) {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      this.capturedImage = canvas.toDataURL('image/png');
-    }
+    if (!context) return;
+
+    context?.drawImage(video, 0, 0);
+
+    this.capturedImage = canvas.toDataURL('image/png');
+
+    // Process captured image
+    const img = await faceapi.fetchImage(this.capturedImage);
+    const displayCanvas = this.canvasRef.nativeElement;
+    const displaySize = { width: img.width, height: img.height };
+    faceapi.matchDimensions(displayCanvas, displaySize);
+
+    const detections = await faceapi.detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions())
+      .withAgeAndGender()
+      .withFaceExpressions();
+
+    const overlayCanvas = this.canvasRef.nativeElement;
+    overlayCanvas.width = canvas.width;
+    overlayCanvas.height = canvas.height;
+
+    const resized = faceapi.resizeResults(detections, displaySize);
+    const overlayCtx = overlayCanvas.getContext('2d');
+    overlayCtx?.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+    faceapi.draw.drawDetections(overlayCanvas, resized);
+    faceapi.draw.drawFaceExpressions(overlayCanvas, resized);
+
+    this.faceInfos = resized.map(det => {
+      const sorted = Object.entries(det.expressions).sort((a, b) => b[1] - a[1]);
+      return {
+        age: det.age,
+        gender: det.gender,
+        emotion: sorted.length ? sorted[0][0] : 'Neutral'
+      };
+    });
+
   }
 }

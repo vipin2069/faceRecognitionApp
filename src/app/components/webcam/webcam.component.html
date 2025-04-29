@@ -1,4 +1,4 @@
-<div class="container text-center mt-4">
+<div class="container text-center m-0 p-4 ">
     <h2>Webcam Feed with Face Detection</h2>
 
     <div class="video-container position-relative">
@@ -16,4 +16,16 @@
         <h4>Captured Image</h4>
         <img [src]="capturedImage" class="img-fluid rounded border" alt="Captured frame" />
     </div>
+    <!-- <div *ngIf="faceInfos.length" class="faceinfos row mt-4 justify-content-center">
+        <div *ngFor="let face of faceInfos" class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Detected Face</h5>
+                    <p><strong>Age:</strong> {{ face.age | number: '1.0-0' }}</p>
+                    <p><strong>Gender:</strong> {{ face.gender }}</p>
+                    <p><strong>Emotion:</strong> {{ face.emotion }}</p>
+                </div>
+            </div>
+        </div>
+    </div> -->
 </div>
