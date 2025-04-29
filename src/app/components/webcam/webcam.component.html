@@ -1,0 +1,19 @@
+<div class="container text-center mt-4">
+    <h2>Webcam Feed with Face Detection</h2>
+
+    <div class="video-container position-relative">
+        <video #video autoplay muted playsinline></video>
+        <canvas #overlay class="position-absolute top-0 start-0"></canvas>
+    </div>
+
+    <div class="mt-3">
+        <button class="btn btn-success me-2" (click)="startCamera()">Start</button>
+        <button class="btn btn-danger me-2" (click)="stopCamera()">Stop</button>
+        <button class="btn btn-primary" (click)="captureImage()">Capture</button>
+    </div>
+
+    <div *ngIf="capturedImage" class="mt-4">
+        <h4>Captured Image</h4>
+        <img [src]="capturedImage" class="img-fluid rounded border" alt="Captured frame" />
+    </div>
+</div>
